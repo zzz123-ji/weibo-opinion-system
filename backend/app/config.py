@@ -53,7 +53,9 @@ def _default_cookie_key(secret: str) -> str:
 class Settings:
     app_name: str = "微博舆情管理系统"
     api_prefix: str = "/api"
-    database_url: str = field(default_factory=_default_database_url)
+    database_url: str = field(
+        default_factory=lambda: os.getenv("DATABASE_URL") or _default_database_url()
+    )
     jwt_secret: str = field(
         default_factory=lambda: os.getenv(
             "JWT_SECRET", "dev-secret-change-me-please-use-32-bytes-minimum"
