@@ -30,7 +30,8 @@ services:
       CRAWLER_MODE: mock
       RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS:-90}
     ports:
-      - "8000:8000"
+      # 只绑定宿主机回环地址；公网访问统一走 web 的 /api 反代。
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy

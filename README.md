@@ -45,8 +45,9 @@ docker compose up -d --build
 ```
 
 - 前端：<http://localhost:8080>
-- API 文档：<http://localhost:8000/docs>
-- 健康检查：<http://localhost:8000/api/health>
+- API 文档（服务器本机）：<http://localhost:8000/docs>
+- 公网访问时：`http://服务器IP:8080`，API 文档走 `http://服务器IP:8080/docs`
+- 健康检查：`http://服务器IP:8080/api/health`
 
 默认 `CRAWLER_MODE=mock`，只读录制样本，不访问微博。
 
@@ -156,6 +157,7 @@ data/crawl/          1,000 条匿名公开数据样本（演示）
 |---|---|
 | [产品设计文档](docs/10_产品设计文档.md) | 目标、非目标、数据模型、API、页面、部署 |
 | [系统架构设计](docs/11_系统架构设计.md) | 拓扑、分层、数据流、ER 图、最终情感、部署、测试、差距 |
+| [云服务器部署与访问控制](docs/12_云服务器部署与访问控制.md) | Docker 部署、域名/HTTPS、安全组、访问控制、备份 |
 | [历史研究报告](docs/01_研究报告.md) | 原离线多模态分析作品（保留） |
 | [历史开发文档](docs/02_开发文档.md) | 原离线流水线与实验（保留） |
 
