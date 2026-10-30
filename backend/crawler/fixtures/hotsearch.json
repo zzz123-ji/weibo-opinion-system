@@ -1,0 +1,12 @@
+{
+  "ok": 1,
+  "data": {
+    "realtime": [
+      {"word": "武汉加油", "num": 980000, "label_name": "热"},
+      {"word": "口罩预约", "num": 760000, "label_name": "新"},
+      {"word": "医院物资", "num": 650000, "label_name": "热"},
+      {"word": "社区志愿者", "num": 420000, "label_name": ""},
+      {"word": "春节返程", "num": 310000, "label_name": ""}
+    ]
+  }
+}

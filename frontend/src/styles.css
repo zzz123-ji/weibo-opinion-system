@@ -1,0 +1,67 @@
+:root {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --ink: #172033;
+  --muted: #6b778c;
+  --line: #e6eaf2;
+  --brand: #1f5eff;
+  --brand-soft: #eaf0ff;
+  --neg: #e5484d;
+  --neu: #8b95a7;
+  --pos: #12a594;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { min-height: 100%; margin: 0; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+}
+a { color: inherit; text-decoration: none; }
+.page { padding: 22px 26px 36px; }
+.page-title { margin: 0 0 4px; font-size: 22px; letter-spacing: .5px; }
+.page-sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(23, 32, 51, .04);
+}
+.panel-pad { padding: 18px 20px; }
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.spacer { flex: 1; }
+.muted { color: var(--muted); }
+.mono { font-family: Consolas, "SFMono-Regular", monospace; }
+.tag-neg { color: var(--neg); background: #fff0f0; border-color: #ffd4d4; }
+.tag-neu { color: #667085; background: #f4f6fa; border-color: #e3e7ef; }
+.tag-pos { color: var(--pos); background: #eafbf7; border-color: #c8f1e7; }
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.metric {
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.metric .label { color: var(--muted); font-size: 12px; }
+.metric .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+.chart { width: 100%; height: 320px; }
+.two-col { display: grid; grid-template-columns: 1.25fr .75fr; gap: 16px; }
+@media (max-width: 1180px) {
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .two-col { grid-template-columns: 1fr; }
+}
+.card-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.empty { padding: 40px 0; text-align: center; color: var(--muted); }

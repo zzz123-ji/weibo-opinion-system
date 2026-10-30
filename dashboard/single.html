@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>单条分析 · 微博多模态情感解释卡</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#050b18; color:#cfe3ff; font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+    min-height:100vh; padding:26px 34px 40px; }
+  header { max-width:1500px; margin:0 auto 18px; border-bottom:1px solid #17396b; padding-bottom:14px; }
+  h1 { font-size:26px; color:#eaf4ff; letter-spacing:2px; }
+  .sub { color:#5f8fce; font-size:12px; margin-top:6px; }
+  .sub b { color:#00e4ff; font-weight:400; }
+  .note { max-width:1500px; margin:0 auto 14px; font-size:12px; color:#7ea2d8;
+    background:rgba(13,32,66,.65); border:1px solid #17396b; border-radius:6px; padding:9px 12px; }
+  main { max-width:1500px; margin:0 auto; display:grid; gap:14px; }
+  .card { display:grid; grid-template-columns:300px 1fr; gap:18px; background:linear-gradient(180deg,rgba(11,26,54,.95),rgba(6,15,33,.95));
+    border:1px solid #163462; border-radius:8px; padding:16px; }
+  .media img { width:100%; border-radius:6px; border:1px solid #244a7d; background:#0a1730; }
+  .media .ph { height:220px; display:flex; align-items:center; justify-content:center;
+    border:1px dashed #244a7d; border-radius:6px; color:#4d6f9e; font-size:12px; }
+  .meta { font-size:11px; color:#4d6f9e; margin-top:8px; line-height:1.7; }
+  .meta code { color:#9fc3ef; }
+  .head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+  .title { font-size:15px; color:#9fd0ff; }
+  .pred { font-size:20px; font-weight:700; }
+  .pred.neg { color:#ff5d73; } .pred.neu { color:#8fa3c8; } .pred.pos { color:#2ee6a8; }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px;
+    border:1px solid #2b4f83; color:#9fc3ef; margin-left:8px; vertical-align:middle; }
+  .badge.ok { border-color:#1d7f63; color:#2ee6a8; }
+  .badge.bad { border-color:#8e3144; color:#ff8fa2; }
+  .text { font-size:13px; line-height:1.8; color:#d7e7ff; margin:10px 0 12px;
+    max-height:92px; overflow:auto; background:#071226; border:1px solid #122c57; border-radius:6px; padding:9px 11px; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .box { background:#071226; border:1px solid #122c57; border-radius:6px; padding:9px 11px; }
+  .box h4 { font-size:12px; color:#9fd0ff; font-weight:600; margin-bottom:8px; }
+  .bar { height:16px; background:#0d1d38; border-radius:3px; overflow:hidden; margin:4px 0 7px; }
+  .bar > i { display:block; height:100%; }
+  .barrow { font-size:11px; color:#8fb2df; display:flex; justify-content:space-between; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { font-size:11px; color:#cfe3ff; background:#102a50; border:1px solid #244a7d;
+    border-radius:12px; padding:2px 9px; }
+  .chip b { color:#ffb347; font-weight:600; }
+  .grid9 { display:grid; grid-template-columns:repeat(3,1fr); gap:3px; width:150px; }
+  .grid9 div { aspect-ratio:1; border-radius:2px; background:#0d1d38; border:1px solid #1b3b67;
+    display:flex; align-items:center; justify-content:center; font-size:9px; color:#8fb2df; }
+  .kv { font-size:11px; color:#8fb2df; line-height:1.9; }
+  .kv b { color:#eaf4ff; font-weight:500; }
+  .caveat { font-size:10.5px; color:#4d6f9e; margin-top:10px; line-height:1.7; }
+  footer { max-width:1500px; margin:20px auto 0; font-size:10.5px; color:#3d5f8e; border-top:1px solid #122c57; padding-top:10px; }
+  a { color:#00e4ff; text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>单条分析 · 微博多模态情感解释卡</h1>
+  <div class="sub">文本 + 图像 · 门控融合 · 缺失场景可用 · <b>离线示例</b> · <a href="index.html">返回舆情大屏</a></div>
+</header>
+<div class="note">
+  本页展示 3 条落盘样本的单条推理结果，用于说明“预测 + 门控权重 + 文本 token 证据 + 图像 3×3 遮挡”的解释链路。
+  示例按“每个真实类别优先选预测正确且置信度高”的展示策略挑选；强度是三类概率映射的演示值，
+  不是人工 -3~3 强度标注；示例不代表总体准确率，完整指标见 output/models_metrics.json。
+</div>
+<main id="cards"></main>
+<footer>数据来源：ScienceDB《Weibo and Twitter datasets》DOI 10.57760/sciencedb.j00133.00366，CC BY 4.0。仅聚合舆情辅助，不用于个体判断或自动处置。</footer>
+<script>
+const DATA = [{"post_id": "wb_b9082d1889d767e4", "true_label": -1, "true_label_name": "负面", "text": "我太难了// :太难了...", "image_file": "images/wb_b9082d1889d767e4.jpg", "image_url": "../data/crawl/images/wb_b9082d1889d767e4.jpg", "prediction": {"label": -1, "label_name": "负面", "probabilities": {"负面": 0.982631, "中性": 0.012011, "正面": 0.005358}, "intensity": -3, "intensity_type": "probability_proxy_not_human_annotated"}, "modalities": {"text_available": true, "image_available": true, "gate": {"text": 0.992615, "image": 0.007385}, "main_modality": "文本"}, "evidence": {"text_top_tokens": [{"token": "难了", "prob_drop": 0.109986, "pred_after_delete": "负面"}, {"token": "太难", "prob_drop": 0.029039, "pred_after_delete": "负面"}, {"token": "我太", "prob_drop": 0.009823, "pred_after_delete": "负面"}], "image_grid": [{"row": 0, "col": 0, "prob_drop": -0.002712}, {"row": 0, "col": 1, "prob_drop": 0.002683}, {"row": 0, "col": 2, "prob_drop": 0.002313}, {"row": 1, "col": 0, "prob_drop": -0.002601}, {"row": 1, "col": 1, "prob_drop": 0.005223}, {"row": 1, "col": 2, "prob_drop": 0.000376}, {"row": 2, "col": 0, "prob_drop": 0.002201}, {"row": 2, "col": 1, "prob_drop": 0.001381}, {"row": 2, "col": 2, "prob_drop": 0.000821}], "method": "文本：删除 jieba 关键词（短文本回退为字符片段）后重算概率；图像：3×3 灰色遮挡后重算概率"}, "latency_ms": 837.7, "caveats": ["情感标签来自公开数据集弱标注，不是人工金标准。", "强度是三类概率映射的演示值，不是人工 -3~3 强度标注。", "解释是删除式遮挡归因，不是因果证明。", "结论只用于聚合舆情辅助，不用于个体心理判断或自动处置。"]}, {"post_id": "wb_6d42bd0740acb4ef", "true_label": 0, "true_label_name": "中性", "text": "// :// :// :转发微博", "image_file": "images/wb_6d42bd0740acb4ef.jpg", "image_url": "../data/crawl/images/wb_6d42bd0740acb4ef.jpg", "prediction": {"label": 0, "label_name": "中性", "probabilities": {"负面": 0.039217, "中性": 0.916604, "正面": 0.044179}, "intensity": 0, "intensity_type": "probability_proxy_not_human_annotated"}, "modalities": {"text_available": true, "image_available": true, "gate": {"text": 0.995723, "image": 0.004277}, "main_modality": "文本"}, "evidence": {"text_top_tokens": [{"token": "转发", "prob_drop": 0.114753, "pred_after_delete": "中性"}, {"token": "发微", "prob_drop": 0.093883, "pred_after_delete": "中性"}, {"token": "微博", "prob_drop": 0.078492, "pred_after_delete": "中性"}], "image_grid": [{"row": 0, "col": 0, "prob_drop": 6.6e-05}, {"row": 0, "col": 1, "prob_drop": 0.002522}, {"row": 0, "col": 2, "prob_drop": -0.001432}, {"row": 1, "col": 0, "prob_drop": 0.002421}, {"row": 1, "col": 1, "prob_drop": 0.007843}, {"row": 1, "col": 2, "prob_drop": 0.002649}, {"row": 2, "col": 0, "prob_drop": -0.001922}, {"row": 2, "col": 1, "prob_drop": -6.5e-05}, {"row": 2, "col": 2, "prob_drop": 0.002122}], "method": "文本：删除 jieba 关键词（短文本回退为字符片段）后重算概率；图像：3×3 灰色遮挡后重算概率"}, "latency_ms": 388.1, "caveats": ["情感标签来自公开数据集弱标注，不是人工金标准。", "强度是三类概率映射的演示值，不是人工 -3~3 强度标注。", "解释是删除式遮挡归因，不是因果证明。", "结论只用于聚合舆情辅助，不用于个体心理判断或自动处置。"]}, {"post_id": "wb_cab09c1129bbbbdc", "true_label": 1, "true_label_name": "正面", "text": "中国加油一起加油// : 医护后盾 致敬所有前线医护工作者和志愿者们辛苦,因为你们我们平安我们都在一起加油等你们平安归来// :致敬奋斗在一线的医护工作者们,共抗疫情,我们始终在一起!", "image_file": "images/wb_cab09c1129bbbbdc.jpg", "image_url": "../data/crawl/images/wb_cab09c1129bbbbdc.jpg", "prediction": {"label": 1, "label_name": "正面", "probabilities": {"负面": 0.004545, "中性": 0.005901, "正面": 0.989555}, "intensity": 3, "intensity_type": "probability_proxy_not_human_annotated"}, "modalities": {"text_available": true, "image_available": true, "gate": {"text": 0.999552, "image": 0.000448}, "main_modality": "文本"}, "evidence": {"text_top_tokens": [{"token": "工作者", "prob_drop": 0.008035, "pred_after_delete": "正面"}, {"token": "加油", "prob_drop": 0.004969, "pred_after_delete": "正面"}, {"token": "致敬", "prob_drop": 0.002762, "pred_after_delete": "正面"}], "image_grid": [{"row": 0, "col": 0, "prob_drop": -0.005757}, {"row": 0, "col": 1, "prob_drop": -0.006329}, {"row": 0, "col": 2, "prob_drop": -0.003878}, {"row": 1, "col": 0, "prob_drop": 0.002371}, {"row": 1, "col": 1, "prob_drop": 0.003214}, {"row": 1, "col": 2, "prob_drop": 0.00596}, {"row": 2, "col": 0, "prob_drop": 0.001735}, {"row": 2, "col": 1, "prob_drop": 0.004514}, {"row": 2, "col": 2, "prob_drop": 0.004023}], "method": "文本：删除 jieba 关键词（短文本回退为字符片段）后重算概率；图像：3×3 灰色遮挡后重算概率"}, "latency_ms": 405.2, "caveats": ["情感标签来自公开数据集弱标注，不是人工金标准。", "强度是三类概率映射的演示值，不是人工 -3~3 强度标注。", "解释是删除式遮挡归因，不是因果证明。", "结论只用于聚合舆情辅助，不用于个体心理判断或自动处置。"]}];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cls = n => n === '负面' ? 'neg' : (n === '正面' ? 'pos' : 'neu');
+const color = n => n === '负面' ? '#ff5d73' : (n === '正面' ? '#2ee6a8' : '#8fa3c8');
+function probBars(p) {
+  return Object.entries(p).map(([k,v]) =>
+    `<div class="barrow"><span>${esc(k)}</span><span>${(v*100).toFixed(1)}%</span></div>
+     <div class="bar"><i style="width:${(v*100).toFixed(1)}%;background:${color(k)}"></i></div>`).join('');
+}
+function gateBars(g) {
+  return `<div class="barrow"><span>文本</span><span>${(g.text*100).toFixed(1)}%</span></div>
+    <div class="bar"><i style="width:${(g.text*100).toFixed(1)}%;background:#00e4ff"></i></div>
+    <div class="barrow"><span>图像</span><span>${(g.image*100).toFixed(1)}%</span></div>
+    <div class="bar"><i style="width:${(g.image*100).toFixed(1)}%;background:#b78cff"></i></div>`;
+}
+function tokens(ev) {
+  const arr = ev && ev.text_top_tokens ? ev.text_top_tokens : [];
+  if (!arr.length) return '<span class="kv">无可用 token 证据</span>';
+  return '<div class="chips">' + arr.map(t =>
+    `<span class="chip">${esc(t.token)} <b>${t.prob_drop >= 0 ? '+' : ''}${Number(t.prob_drop).toFixed(4)}</b></span>`).join('') + '</div>';
+}
+function grid9(ev) {
+  const arr = ev && ev.image_grid ? ev.image_grid : null;
+  if (!arr) return '<span class="kv">无图像或未计算</span>';
+  const mx = Math.max(0.0001, ...arr.map(x => Math.abs(x.prob_drop)));
+  return '<div class="grid9">' + arr.map(x => {
+    const a = Math.min(1, Math.abs(x.prob_drop) / mx);
+    const bg = x.prob_drop >= 0 ? `rgba(255,93,115,${0.12 + 0.78*a})` : `rgba(0,228,255,${0.10 + 0.55*a})`;
+    return `<div style="background:${bg}" title="行${x.row+1}列${x.col+1}：${x.prob_drop}">${x.prob_drop.toFixed(3)}</div>`;
+  }).join('') + '</div>';
+}
+document.getElementById('cards').innerHTML = DATA.map((c, i) => {
+  const p = c.prediction;
+  const ok = p.label === c.true_label;
+  return `<section class="card">
+    <div class="media">
+      ${c.image_url ? `<img src="${esc(c.image_url)}" alt="配图">` : '<div class="ph">无配图</div>'}
+      <div class="meta">样本 ${i+1} · <code>${esc(c.post_id)}</code><br>
+        真实标签：<b>${esc(c.true_label_name)}</b> · 图片：<code>${esc(c.image_file)}</code></div>
+    </div>
+    <div>
+      <div class="head">
+        <div>
+          <div class="title">预测结果 <span class="badge ${ok?'ok':'bad'}">${ok?'与真实标签一致':'与真实标签不一致'}</span></div>
+          <div class="pred ${cls(p.label_name)}">${esc(p.label_name)} <span class="badge">强度演示 ${p.intensity}</span></div>
+        </div>
+        <div class="kv">单条耗时 <b>${c.latency_ms ?? '—'} ms</b><br>主参考模态 <b>${esc(c.modalities.main_modality)}</b></div>
+      </div>
+      <div class="text">${esc(c.text)}</div>
+      <div class="cols">
+        <div class="box"><h4>三类概率</h4>${probBars(p.probabilities)}</div>
+        <div class="box"><h4>门控权重</h4>${gateBars(c.modalities.gate)}
+          <div class="kv" style="margin-top:6px">缺失时门控自动切换到可用模态；双缺失退化为先验。</div></div>
+      </div>
+      <div class="cols" style="margin-top:12px">
+        <div class="box"><h4>文本证据 · 删除后概率下降 TOP3</h4>${tokens(c.evidence)}</div>
+        <div class="box"><h4>图像证据 · 3×3 遮挡（仅图像场景）</h4>${grid9(c.evidence)}</div>
+      </div>
+      <div class="caveat">${c.caveats.map(esc).join(' ')}</div>
+    </div>
+  </section>`;
+}).join('');
+</script>
+</body>
+</html>

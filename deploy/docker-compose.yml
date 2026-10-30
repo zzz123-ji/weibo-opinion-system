@@ -1,0 +1,70 @@
+name: weibo-opinion
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: weibo
+      POSTGRES_USER: weibo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weibo_dev_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weibo -d weibo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://weibo:${POSTGRES_PASSWORD:-weibo_dev_password}@db:5432/weibo
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      COOKIE_ENCRYPTION_KEY: ${COOKIE_ENCRYPTION_KEY:-}
+      SEED_DEMO: "1"
+      CRAWLER_MODE: mock
+      RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS:-90}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  crawler:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    command: sh -c "python -m app.seed --admin-only && python -m crawler.scheduler"
+    environment:
+      DATABASE_URL: postgresql+psycopg://weibo:${POSTGRES_PASSWORD:-weibo_dev_password}@db:5432/weibo
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      COOKIE_ENCRYPTION_KEY: ${COOKIE_ENCRYPTION_KEY:-}
+      SEED_DEMO: "0"
+      CRAWLER_MODE: ${CRAWLER_MODE:-mock}
+      CRAWL_RATE_LIMIT_SECONDS: ${CRAWL_RATE_LIMIT_SECONDS:-2.5}
+      RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS:-90}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:

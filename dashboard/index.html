@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>微博多模态舆情——模态缺失鲁棒、可解释情感分析大屏</title>
+<script src="echarts.min.js"></script>
+<script src="data.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; background:#050b18; color:#cfe3ff;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif; overflow:hidden; }
+  #screen { width:1920px; height:1080px; transform-origin:top left;
+    padding:10px 18px 6px; position:relative;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(0,120,255,.18), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(0,228,255,.06), transparent 45%),
+      #050b18; }
+  header { height:64px; text-align:center; position:relative; }
+  header h1 { font-size:28px; letter-spacing:4px; color:#eaf4ff;
+    text-shadow:0 0 18px rgba(0,180,255,.75); font-weight:700; line-height:44px; }
+  header .sub { font-size:12px; color:#5f8fce; letter-spacing:1.5px; }
+  header .meta { position:absolute; right:2px; top:2px; text-align:right;
+    font-size:10px; color:#4d6f9e; line-height:16px; }
+  header .meta b { color:#00e4ff; font-weight:400; }
+  .kpis { display:grid; grid-template-columns:repeat(8,1fr); gap:10px; margin:6px 0 10px; }
+  .kpi { background:linear-gradient(180deg,rgba(13,32,66,.95),rgba(7,17,38,.95));
+    border:1px solid #17396b; border-radius:6px; padding:7px 4px 6px; text-align:center;
+    position:relative; overflow:hidden; }
+  .kpi::after { content:""; position:absolute; left:0; top:0; width:100%; height:2px;
+    background:linear-gradient(90deg,transparent,#00e4ff,transparent); opacity:.65; }
+  .kpi .v { font-size:23px; color:#00e4ff; font-weight:700; line-height:28px;
+    text-shadow:0 0 12px rgba(0,228,255,.35); }
+  .kpi .l { font-size:10.5px; color:#7ea2d8; margin-top:2px; letter-spacing:.5px; }
+  .kpi .v.good { color:#2ee6a8; }
+  .kpi .v.warn { color:#ffb347; }
+  .kpi .v.bad { color:#ff5d73; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr);
+    grid-template-rows:238px repeat(3,206px); grid-auto-rows:206px; gap:8px; }
+  .grid .span2 { grid-column:span 2; }
+  .panel { background:linear-gradient(180deg,rgba(11,26,54,.86),rgba(6,15,33,.86));
+    border:1px solid #163462; border-radius:6px; display:flex; flex-direction:column;
+    box-shadow:inset 0 0 24px rgba(0,80,180,.08); overflow:hidden; }
+  .panel h3 { font-size:13px; color:#9fd0ff; padding:6px 10px; border-bottom:1px solid #122c57;
+    letter-spacing:1px; font-weight:600; display:flex; justify-content:space-between; }
+  .panel h3 span { font-size:10px; color:#4d6f9e; font-weight:400; letter-spacing:0; }
+  .panel h3::before { content:"▌"; color:#00e4ff; margin-right:5px; }
+  .chart { flex:1; min-height:0; }
+  .note { font-size:10px; color:#4d6f9e; padding:0 10px 5px; line-height:14px; }
+  footer { height:18px; margin-top:4px; font-size:10px; color:#3d5f8e;
+    display:flex; justify-content:space-between; align-items:center; }
+  footer b { color:#5f8fce; font-weight:400; }
+</style>
+</head>
+<body>
+<div id="screen">
+  <header>
+    <h1>微博多模态舆情 · 模态缺失鲁棒与可解释情感分析</h1>
+    <div class="sub">2020 年疫情早期公开图文帖 · 文本 + 图像 · 门控融合 · 缺失场景评估 · 聚合舆情预警</div>
+    <div class="meta">
+      数据来源：ScienceDB · CC BY 4.0<br>
+      DOI <b>10.57760/sciencedb.j00133.00366</b><br>
+      生成时间 <b id="gen_time">—</b>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="panel span2">
+      <h3>日度声量与负向率趋势 <span>2020-01-01 ~ 2020-02-18 · n≥50</span></h3>
+      <div class="chart" id="c_trend"></div>
+      <div class="note" id="trend_note"></div>
+    </div>
+    <div class="panel">
+      <h3>情感分布 <span>全量 56,649 条</span></h3>
+      <div class="chart" id="c_sent"></div>
+      <div class="note" id="sent_note"></div>
+    </div>
+    <div class="panel">
+      <h3>NMF 话题结构 TOP8 <span>TF-IDF + NMF k=8</span></h3>
+      <div class="chart" id="c_topic"></div>
+      <div class="note" id="topic_note"></div>
+    </div>
+
+    <div class="panel">
+      <h3>负向关键词 TOP10 <span>对数几率比 × log(词频)</span></h3>
+      <div class="chart" id="c_neg"></div>
+      <div class="note">排除人名/地名/机构名，避免专名干扰</div>
+    </div>
+    <div class="panel">
+      <h3>正向关键词 TOP10 <span>对数几率比 × log(词频)</span></h3>
+      <div class="chart" id="c_pos"></div>
+      <div class="note">正向词以鼓励、致敬、康复为主</div>
+    </div>
+    <div class="panel">
+      <h3>省份提及 TOP10 <span>文本提及 · 非用户定位</span></h3>
+      <div class="chart" id="c_prov"></div>
+      <div class="note" id="prov_note"></div>
+    </div>
+    <div class="panel">
+      <h3>话题标签 TOP10 <span>#话题# · 全量</span></h3>
+      <div class="chart" id="c_hash"></div>
+      <div class="note" id="hash_note"></div>
+    </div>
+
+    <div class="panel">
+      <h3>完整模态模型对比 <span>测试集 1,800 条 · Macro-F1</span></h3>
+      <div class="chart" id="c_model"></div>
+      <div class="note" id="model_note"></div>
+    </div>
+    <div class="panel">
+      <h3>缺失模态鲁棒性 <span>仅文本 / 仅图像 / 双缺失</span></h3>
+      <div class="chart" id="c_robust"></div>
+      <div class="note">双缺失退化为先验，仅作能力下限，不作为可用能力宣传</div>
+    </div>
+    <div class="panel">
+      <h3>真实无图外部测试 <span>3,000 条 · Macro-F1</span></h3>
+      <div class="chart" id="c_ext"></div>
+      <div class="note" id="ext_note"></div>
+    </div>
+    <div class="panel">
+      <h3>门控权重 <span>按真实类别 · 完整模态</span></h3>
+      <div class="chart" id="c_gate"></div>
+      <div class="note" id="gate_note"></div>
+    </div>
+
+    <div class="panel span2">
+      <h3>重点观察日 <span>负向率 z≥1.0 或声量 z≥1.5</span></h3>
+      <div class="chart" id="c_alert"></div>
+      <div class="note" id="alert_note"></div>
+    </div>
+    <div class="panel">
+      <h3>文本遮挡解释 TOP8 <span>删除关键词后真实类概率下降</span></h3>
+      <div class="chart" id="c_textocc"></div>
+      <div class="note" id="textocc_note"></div>
+    </div>
+    <div class="panel">
+      <h3>图像 3×3 遮挡敏感性 <span>仅图像场景 · 概率下降</span></h3>
+      <div class="chart" id="c_imgocc"></div>
+      <div class="note" id="imgocc_note"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div>说明：仅使用公开数据集聚合分析；不含账号名、原始微博 ID、图片 URL。情感标签为公开数据集弱标注，结论不外推到个体用户。</div>
+    <div>中国大学生计算机设计大赛 · 大数据应用-大数据实践赛 · <b>离线大屏</b></div>
+  </footer>
+</div>
+
+<script>
+const D = window.DASH_DATA;
+const C = { main:'#00e4ff', blue:'#1e90ff', sub:'#3d7fd6', warn:'#ffb347',
+            bad:'#ff5d73', good:'#2ee6a8', purple:'#b78cff', axis:'#4d6f9e' };
+const baseText = { color:'#9fc3ef', fontFamily:'Microsoft YaHei', fontSize:11 };
+const axisStyle = { axisLine:{lineStyle:{color:'#28467a'}}, axisTick:{show:false},
+  axisLabel:{color:C.axis,fontSize:10},
+  splitLine:{lineStyle:{color:'rgba(40,70,122,.30)'}} };
+const gridBase = { left:52, right:22, top:34, bottom:26, containLabel:true };
+const pct = v => (Number(v)*100).toFixed(1) + '%';
+
+document.getElementById('gen_time').textContent = D.meta.generated_at;
+
+/* ---------- KPI ---------- */
+const k = D.kpi;
+const kpis = [
+  ['全量有效帖', k.total.toLocaleString(), ''],
+  ['建模样本', k.sample.toLocaleString(), ''],
+  ['采集落盘', k.crawl.toLocaleString(), 'crawl'],
+  ['负面占比', k.neg_pct.toFixed(1)+'%', 'bad'],
+  ['1/20 后声量增长', '+'+k.volume_growth.toFixed(1)+'%', 'warn'],
+  ['门控 Macro-F1', k.gated_f1.toFixed(3), 'good'],
+  ['外部无图 F1', k.external_f1.toFixed(3), ''],
+  ['重点观察日', k.alerts, 'warn'],
+];
+document.getElementById('kpis').innerHTML = kpis.map(([l,v,cls]) =>
+  `<div class="kpi"><div class="v ${cls==='crawl'?'':cls}">${v}</div><div class="l">${l}${cls==='crawl'?'（'+k.crawl_users+' 用户）':''}</div></div>`).join('');
+
+/* ---------- 1 日度趋势 ---------- */
+const cTrend = echarts.init(document.getElementById('c_trend'));
+const dates = D.daily.map(r=>r.date.slice(5));
+cTrend.setOption({
+  tooltip:{trigger:'axis', backgroundColor:'rgba(5,15,35,.92)', borderColor:'#1e90ff',
+    textStyle:{color:'#cfe3ff',fontSize:11}},
+  legend:{textStyle:baseText, top:2, itemWidth:12, itemHeight:8},
+  grid:{left:48,right:52,top:34,bottom:28,containLabel:true},
+  xAxis:{type:'category', data:dates, ...axisStyle,
+    axisLabel:{color:C.axis,fontSize:9,interval:4}},
+  yAxis:[
+    {type:'value', name:'声量(条)', nameTextStyle:{color:C.axis,fontSize:10}, ...axisStyle},
+    {type:'value', name:'负向率(%)', max:30, nameTextStyle:{color:C.axis,fontSize:10}, ...axisStyle,
+      splitLine:{show:false}}
+  ],
+  series:[
+    {name:'日声量', type:'bar', data:D.daily.map(r=>r.n), barWidth:'55%',
+      itemStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+        colorStops:[{offset:0,color:'rgba(0,228,255,.85)'},{offset:1,color:'rgba(0,80,180,.25)'}]},
+        borderRadius:[2,2,0,0]},
+      markLine:{silent:true,symbol:'none',
+        lineStyle:{color:'#ffb347',type:'dashed',width:1},
+        label:{formatter:'1/20',color:'#ffb347',fontSize:10},
+        data:[{xAxis:'01-20'}]}},
+    {name:'负向率', type:'line', yAxisIndex:1, data:D.daily.map(r=>r.neg_ratio),
+      smooth:true, symbol:'none', lineStyle:{color:C.bad,width:2}, itemStyle:{color:C.bad}},
+    {name:'7日负向率', type:'line', yAxisIndex:1, data:D.daily.map(r=>r.neg_ratio_7d),
+      smooth:true, symbol:'none', lineStyle:{color:C.warn,width:1.2,type:'dashed'},
+      itemStyle:{color:C.warn}},
+  ]
+});
+document.getElementById('trend_note').textContent =
+  `全量口径：1/20 前日均 ${D.trend.pre_jan20_mean_n} 条 → 之后 ${D.trend.post_jan20_mean_n} 条，` +
+  `增长 ${(D.trend.volume_growth*100).toFixed(1)}%；峰值 ${D.trend.peak_volume_date}（${D.trend.peak_volume_n} 条）。`;
+
+/* ---------- 2 情感分布 ---------- */
+const cSent = echarts.init(document.getElementById('c_sent'));
+cSent.setOption({
+  tooltip:{trigger:'item', formatter:'{b}<br/>{c} 条（{d}%）'},
+  legend:{bottom:2, textStyle:baseText, itemWidth:10, itemHeight:8},
+  title:{text:D.kpi.total.toLocaleString(), subtext:'有效帖', left:'center', top:'33%',
+    textStyle:{color:'#eaf4ff',fontSize:20,fontWeight:700},
+    subtextStyle:{color:C.axis,fontSize:10}},
+  series:[{type:'pie', radius:['46%','68%'], center:['50%','44%'],
+    avoidLabelOverlap:true,
+    data:D.sentiment.map(o=>({...o,
+      itemStyle:{color:{'负面':C.bad,'中性':'#5f7fae','正面':C.good}[o.name]}})),
+    label:{color:'#cfe3ff',fontSize:11,formatter:'{b}\n{d}%'},
+    labelLine:{lineStyle:{color:'#28467a'}},
+    emphasis:{scale:true, scaleSize:5}}]
+});
+document.getElementById('sent_note').textContent =
+  `负面 ${D.sentiment[0].count.toLocaleString()} · 中性 ${D.sentiment[1].count.toLocaleString()} · 正面 ${D.sentiment[2].count.toLocaleString()}`;
+
+/* ---------- 3 话题结构 ---------- */
+const cTopic = echarts.init(document.getElementById('c_topic'));
+const topicData = D.topics.slice().sort((a,b)=>a.n-b.n);
+cTopic.setOption({
+  tooltip:{trigger:'axis', axisPointer:{type:'shadow'},
+    formatter:p=>{const d=topicData[p[0].dataIndex];
+      return `${d.label}<br/>声量 ${d.n.toLocaleString()}（${d.share}%）<br/>负向率 ${d.neg_ratio}%`;}},
+  grid:{left:8,right:46,top:10,bottom:8,containLabel:true},
+  xAxis:{type:'value', ...axisStyle, axisLabel:{show:false}, splitLine:{show:false}},
+  yAxis:{type:'category', data:topicData.map(r=>r.label.length>11?r.label.slice(0,11)+'…':r.label),
+    ...axisStyle, axisLabel:{color:'#9fc3ef',fontSize:10}},
+  series:[{type:'bar', data:topicData.map(r=>r.n), barWidth:'58%',
+    itemStyle:{color:{type:'linear',x:0,y:0,x2:1,y2:0,
+      colorStops:[{offset:0,color:'#123c78'},{offset:1,color:C.main}]},borderRadius:[0,3,3,0]},
+    label:{show:true,position:'right',color:'#9fc3ef',fontSize:9,
+      formatter:p=>topicData[p.dataIndex].share+'%'}}]
+});
+document.getElementById('topic_note').textContent =
+  `最大话题「${D.topics[0].label}」${D.topics[0].n.toLocaleString()} 条（${D.topics[0].share}%），负向率 ${D.topics[0].neg_ratio}%`;
+
+/* ---------- 4/5 关键词 ---------- */
+function kwChart(id, rows, color) {
+  const c = echarts.init(document.getElementById(id));
+  const d = rows.slice().reverse();
+  c.setOption({
+    tooltip:{trigger:'axis', formatter:p=>{const x=d[p[0].dataIndex];
+      return `${x.word}<br/>词频 ${x.count}<br/>得分 ${x.score}`;}},
+    grid:{left:8,right:34,top:8,bottom:8,containLabel:true},
+    xAxis:{type:'value', ...axisStyle, axisLabel:{show:false}, splitLine:{show:false}},
+    yAxis:{type:'category', data:d.map(r=>r.word), ...axisStyle,
+      axisLabel:{color:'#9fc3ef',fontSize:10}},
+    series:[{type:'bar', data:d.map(r=>r.count), barWidth:'55%',
+      itemStyle:{color:{type:'linear',x:0,y:0,x2:1,y2:0,
+        colorStops:[{offset:0,color:'rgba(30,60,110,.35)'},{offset:1,color}]},
+        borderRadius:[0,3,3,0]},
+      label:{show:true,position:'right',color:'#9fc3ef',fontSize:9}}]
+  });
+  return c;
+}
+const cNeg = kwChart('c_neg', D.keywords.neg, C.bad);
+const cPos = kwChart('c_pos', D.keywords.pos, C.good);
+
+/* ---------- 6 省份 ---------- */
+const cProv = echarts.init(document.getElementById('c_prov'));
+const prov = D.provinces.slice().reverse();
+cProv.setOption({
+  tooltip:{trigger:'axis', formatter:p=>{const x=prov[p[0].dataIndex];
+    return `${x.province}<br/>提及 ${x.n.toLocaleString()}<br/>负向率 ${x.neg_ratio}% · 正向率 ${x.pos_ratio}%`;}},
+  grid:{left:8,right:36,top:8,bottom:8,containLabel:true},
+  xAxis:{type:'value', ...axisStyle, axisLabel:{show:false}, splitLine:{show:false}},
+  yAxis:{type:'category', data:prov.map(r=>r.province), ...axisStyle,
+    axisLabel:{color:'#9fc3ef',fontSize:10}},
+  series:[{type:'bar', data:prov.map(r=>r.n), barWidth:'55%',
+    itemStyle:{color:{type:'linear',x:0,y:0,x2:1,y2:0,
+      colorStops:[{offset:0,color:'#123c78'},{offset:1,color:'#5fa8ff'}]},borderRadius:[0,3,3,0]},
+    label:{show:true,position:'right',color:'#9fc3ef',fontSize:9,
+      formatter:p=>prov[p.dataIndex].n.toLocaleString()}}]
+});
+document.getElementById('prov_note').textContent =
+  `湖北 ${D.provinces[0].n.toLocaleString()} 条（${(D.provinces[0].n/D.kpi.total*100).toFixed(1)}%），负向率 ${D.provinces[0].neg_ratio}%`;
+
+/* ---------- 7 话题标签 ---------- */
+const cHash = echarts.init(document.getElementById('c_hash'));
+const hash = D.hashtags.slice().reverse();
+cHash.setOption({
+  tooltip:{trigger:'axis', formatter:p=>{const x=hash[p[0].dataIndex];
+    return `#${x.tag}#<br/>${x.n} 条<br/>负向率 ${x.neg_ratio}% · 正向率 ${x.pos_ratio}%`;}},
+  grid:{left:8,right:32,top:8,bottom:8,containLabel:true},
+  xAxis:{type:'value', ...axisStyle, axisLabel:{show:false}, splitLine:{show:false}},
+  yAxis:{type:'category', data:hash.map(r=>'#'+r.tag+'#'), ...axisStyle,
+    axisLabel:{color:'#9fc3ef',fontSize:9,width:100,overflow:'truncate'}},
+  series:[{type:'bar', data:hash.map(r=>r.n), barWidth:'55%',
+    itemStyle:{color:{type:'linear',x:0,y:0,x2:1,y2:0,
+      colorStops:[{offset:0,color:'rgba(120,80,180,.25)'},{offset:1,color:C.purple}]},borderRadius:[0,3,3,0]},
+    label:{show:true,position:'right',color:'#9fc3ef',fontSize:9}}]
+});
+document.getElementById('hash_note').textContent =
+  `#${D.hashtags[0].tag}# ${D.hashtags[0].n} 条，正向率 ${D.hashtags[0].pos_ratio}%`;
+
+/* ---------- 8 模型对比 ---------- */
+const cModel = echarts.init(document.getElementById('c_model'));
+const models = D.models.complete;
+cModel.setOption({
+  tooltip:{trigger:'axis', formatter:p=>{const x=models[p[0].dataIndex];
+    return `${x.label}<br/>Macro-F1 ${x.macro_f1.toFixed(3)}<br/>95% CI ${x.ci_low.toFixed(3)}~${x.ci_high.toFixed(3)}`;}},
+  grid:{left:8,right:8,top:12,bottom:8,containLabel:true},
+  xAxis:{type:'category', data:models.map(r=>r.short||r.label), ...axisStyle,
+    axisLabel:{color:C.axis,fontSize:9,rotate:0}},
+  yAxis:{type:'value', min:0, max:0.8, ...axisStyle,
+    axisLabel:{color:C.axis,fontSize:9,formatter:v=>v.toFixed(1)}},
+  series:[{type:'bar', data:models.map(r=>({value:r.macro_f1,
+      itemStyle:{color:r.model==='gated'?C.good:(r.model==='text_lr'?'#5fa8ff':'#1e90ff'),
+        borderRadius:[3,3,0,0]}})), barWidth:'48%',
+    label:{show:true,position:'top',color:'#9fc3ef',fontSize:9,
+      formatter:p=>p.value.toFixed(3)}}]
+});
+document.getElementById('model_note').textContent =
+  `本文 ${D.models.complete.find(x=>x.model==='gated').macro_f1.toFixed(3)}；文本单模态 ${D.models.complete.find(x=>x.model==='text_lr').macro_f1.toFixed(3)}；差异在 95% CI 内重叠`;
+
+/* ---------- 9 缺失鲁棒 ---------- */
+const cRobust = echarts.init(document.getElementById('c_robust'));
+const scen = [{k:'text-only',n:'仅文本'},{k:'image-only',n:'仅图像'},{k:'both-missing',n:'双缺失'}];
+const robModels = ['early_lr','late_lr','gated','early_mlp'];
+const robColors = {early_lr:'#1e90ff', late_lr:'#5fa8ff', gated:C.good, early_mlp:C.warn};
+const robLabels = {early_lr:'早期融合LR', late_lr:'晚期融合', gated:'门控融合', early_mlp:'早期融合MLP'};
+cRobust.setOption({
+  tooltip:{trigger:'axis', axisPointer:{type:'shadow'},
+    formatter:p=>p.map(x=>`${x.seriesName}: ${Number(x.value).toFixed(3)}`).join('<br/>')},
+  legend:{top:0,textStyle:{...baseText,fontSize:9},itemWidth:10,itemHeight:7},
+  grid:{left:8,right:8,top:32,bottom:6,containLabel:true},
+  xAxis:{type:'category', data:scen.map(s=>s.n), ...axisStyle,
+    axisLabel:{color:'#9fc3ef',fontSize:10}},
+  yAxis:{type:'value', min:0, max:0.75, ...axisStyle,
+    axisLabel:{color:C.axis,fontSize:9,formatter:v=>v.toFixed(1)}},
+  series:robModels.map(m=>({
+    name:robLabels[m], type:'bar', barWidth:'17%',
+    data:scen.map(s=>{const r=D.models.robustness.find(x=>x.model===m&&x.scenario===s.k);return r?r.macro_f1:0;}),
+    itemStyle:{color:robColors[m],borderRadius:[2,2,0,0]},
+    label:{show:m==='gated',position:'top',color:C.good,fontSize:8,
+      formatter:p=>Number(p.value).toFixed(2)}
+  }))
+});
+
+/* ---------- 10 外部测试 ---------- */
+const cExt = echarts.init(document.getElementById('c_ext'));
+const ext = D.models.external;
+cExt.setOption({
+  tooltip:{trigger:'axis', formatter:p=>{const x=ext[p[0].dataIndex];
+    return `${x.label}<br/>Macro-F1 ${x.macro_f1.toFixed(3)}<br/>95% CI ${x.ci_low.toFixed(3)}~${x.ci_high.toFixed(3)}`;}},
+  grid:{left:8,right:8,top:12,bottom:8,containLabel:true},
+  xAxis:{type:'category', data:ext.map(r=>r.short||r.label), ...axisStyle,
+    axisLabel:{color:C.axis,fontSize:9,rotate:0}},
+  yAxis:{type:'value', min:0, max:0.7, ...axisStyle,
+    axisLabel:{color:C.axis,fontSize:9,formatter:v=>v.toFixed(1)}},
+  series:[{type:'bar', data:ext.map(r=>({value:r.macro_f1,
+      itemStyle:{color:r.model==='gated'?C.good:'#1e90ff',borderRadius:[3,3,0,0]}})), barWidth:'45%',
+    label:{show:true,position:'top',color:'#9fc3ef',fontSize:9,
+      formatter:p=>p.value.toFixed(3)}}]
+});
+document.getElementById('ext_note').textContent =
+  `门控 ${D.models.external.find(x=>x.model==='gated').macro_f1.toFixed(3)}；文本 ${D.models.external.find(x=>x.model==='text_lr').macro_f1.toFixed(3)}；图像真实缺失`;
+
+/* ---------- 11 门控权重 ---------- */
+const cGate = echarts.init(document.getElementById('c_gate'));
+const gates = D.gates;
+cGate.setOption({
+  tooltip:{trigger:'axis', axisPointer:{type:'shadow'},
+    formatter:p=>{const g=gates[p[0].dataIndex];
+      return `${g.label}<br/>文本门控 ${(g.text_gate*100).toFixed(1)}%<br/>图像门控 ${(g.image_gate*100).toFixed(1)}%`;}},
+  legend:{top:0,textStyle:{...baseText,fontSize:9},itemWidth:10,itemHeight:7},
+  grid:{left:8,right:8,top:28,bottom:6,containLabel:true},
+  xAxis:{type:'value',max:100,...axisStyle,axisLabel:{color:C.axis,fontSize:9,formatter:'{value}%'}},
+  yAxis:{type:'category',data:gates.map(g=>g.label),...axisStyle,
+    axisLabel:{color:'#9fc3ef',fontSize:10}},
+  series:[
+    {name:'文本',type:'bar',stack:'g',barWidth:'46%',data:gates.map(g=>+(g.text_gate*100).toFixed(1)),
+     itemStyle:{color:'#1e90ff'},label:{show:true,position:'inside',color:'#eaf4ff',fontSize:9,
+       formatter:p=>p.value>12?p.value+'%':''}},
+    {name:'图像',type:'bar',stack:'g',barWidth:'46%',data:gates.map(g=>+(g.image_gate*100).toFixed(1)),
+     itemStyle:{color:C.good,borderRadius:[0,3,3,0]},label:{show:true,position:'right',color:C.good,fontSize:9,
+       formatter:p=>p.value>=3?p.value+'%':''}}
+  ]
+});
+document.getElementById('gate_note').textContent =
+  `全部门控均值：文本 ${(D.gates[0].text_gate*100).toFixed(1)}% / 图像 ${(D.gates[0].image_gate*100).toFixed(1)}%；图像在文本缺失时接管`;
+
+/* ---------- 12 重点观察日 ---------- */
+const cAlert = echarts.init(document.getElementById('c_alert'));
+const alerts = D.alerts.slice().reverse();
+cAlert.setOption({
+  tooltip:{trigger:'axis', formatter:p=>{const a=alerts[p[0].dataIndex];
+    return `${a.date}<br/>声量 ${a.n}<br/>负向率 ${(a.neg_ratio*100).toFixed(1)}%<br/>${a.reason}`;}},
+  grid:{left:8,right:12,top:8,bottom:8,containLabel:true},
+  xAxis:{type:'value', ...axisStyle, name:'综合得分', nameTextStyle:{color:C.axis,fontSize:9},
+    axisLabel:{color:C.axis,fontSize:9}, splitLine:{lineStyle:{color:'rgba(40,70,122,.25)'}}},
+  yAxis:{type:'category', data:alerts.map(a=>a.date.slice(5)), ...axisStyle,
+    axisLabel:{color:'#9fc3ef',fontSize:10}},
+  series:[{type:'bar', data:alerts.map(a=>({value:a.score,
+      itemStyle:{color:a.level==='高'?C.bad:C.warn,borderRadius:[0,3,3,0]}})), barWidth:'52%',
+    label:{show:true,position:'right',color:'#9fc3ef',fontSize:9,
+      formatter:p=>{const a=alerts[p.dataIndex];return `${(a.neg_ratio*100).toFixed(1)}% · ${a.n}条`;}}}]
+});
+document.getElementById('alert_note').textContent =
+  `共 ${D.kpi.alerts} 天触发；最高 ${D.alerts[0].date}（${D.alerts[0].n} 条，负向率 ${(D.alerts[0].neg_ratio*100).toFixed(1)}%）；基线负向率 16.6%`;
+
+/* ---------- 13 文本遮挡 ---------- */
+const cTextOcc = echarts.init(document.getElementById('c_textocc'));
+const toks = (D.explainability.text_occlusion.top_tokens||[]).slice(0,8).reverse();
+cTextOcc.setOption({
+  tooltip:{trigger:'axis', formatter:p=>{const t=toks[p[0].dataIndex];
+    return `${t.token}<br/>平均概率下降 ${t.mean_prob_drop.toFixed(3)}<br/>出现 ${t.n} 次`;}},
+  grid:{left:8,right:38,top:8,bottom:8,containLabel:true},
+  xAxis:{type:'value', ...axisStyle, axisLabel:{show:false}, splitLine:{show:false}},
+  yAxis:{type:'category', data:toks.map(t=>t.token), ...axisStyle,
+    axisLabel:{color:'#9fc3ef',fontSize:10}},
+  series:[{type:'bar', data:toks.map(t=>t.mean_prob_drop), barWidth:'55%',
+    itemStyle:{color:{type:'linear',x:0,y:0,x2:1,y2:0,
+      colorStops:[{offset:0,color:'rgba(255,93,115,.25)'},{offset:1,color:C.bad}]},borderRadius:[0,3,3,0]},
+    label:{show:true,position:'right',color:'#9fc3ef',fontSize:9,
+      formatter:p=>p.value.toFixed(3)}}]
+});
+document.getElementById('textocc_note').textContent =
+  `${D.explainability.text_occlusion.n_samples} 条测试样本、删除关键词后重算；值越大表示该词越支撑原预测`;
+
+/* ---------- 14 图像遮挡 ---------- */
+const cImgOcc = echarts.init(document.getElementById('c_imgocc'));
+const grid = D.explainability.image_occlusion.grid || [];
+const occData = [];
+for (let r=0;r<grid.length;r++) for (let c=0;c<grid[r].length;c++) occData.push([c,r,grid[r][c]]);
+cImgOcc.setOption({
+  tooltip:{formatter:p=>`区域 行${p.value[1]+1}/列${p.value[0]+1}<br/>概率下降 ${Number(p.value[2]).toFixed(4)}`},
+  grid:{left:30,right:10,top:10,bottom:24,containLabel:true},
+  xAxis:{type:'category',data:['左','中','右'],...axisStyle,splitLine:{show:false}},
+  yAxis:{type:'category',data:['上','中','下'],inverse:true,...axisStyle,splitLine:{show:false}},
+  visualMap:{min:0,max:Math.max(0.012,...grid.flat()),calculable:false,orient:'horizontal',
+    left:'center',bottom:0,itemWidth:8,itemHeight:60,
+    textStyle:{color:C.axis,fontSize:8},
+    inRange:{color:['#0b1a36','#123c78','#1e90ff','#00e4ff','#ffb347']}},
+  series:[{type:'heatmap',data:occData,
+    label:{show:true,color:'#eaf4ff',fontSize:9,formatter:p=>Number(p.value[2]).toFixed(3)},
+    itemStyle:{borderColor:'#050b18',borderWidth:2}}]
+});
+document.getElementById('imgocc_note').textContent =
+  `${D.explainability.image_occlusion.n_samples} 条仅图像样本；底部中间区域下降最大，区域间差异较小，说明图像分支依赖主体区域`;
+
+/* ---------- 自适应缩放 ---------- */
+const charts = [cTrend,cSent,cTopic,cNeg,cPos,cProv,cHash,cModel,cRobust,cExt,cGate,cAlert,cTextOcc,cImgOcc];
+function fit(){
+  const s = document.getElementById('screen');
+  const sx = window.innerWidth/1920, sy = window.innerHeight/1080;
+  s.style.transform = `scale(${Math.min(sx,sy)})`;
+}
+window.addEventListener('resize', ()=>{ fit(); charts.forEach(c=>c.resize()); });
+fit();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-10-26 10:07:24",
+  "n": 1000,
+  "unique_user_id": 992,
+  "label_counts": {
+    "-1": 334,
+    "0": 333,
+    "1": 333
+  },
+  "date_min": "2020-01-01",
+  "date_max": "2020-02-18",
+  "columns": [
+    "post_id",
+    "user_id",
+    "user_id_type",
+    "time",
+    "date",
+    "text",
+    "text_len",
+    "label",
+    "label_name",
+    "image_file",
+    "context",
+    "image_sha256",
+    "image_width",
+    "image_height",
+    "image_bytes",
+    "source",
+    "source_type",
+    "dataset_doi",
+    "crawl_time"
+  ],
+  "context": "JSON(text,image)",
+  "images": 1000,
+  "image_missing": 0,
+  "image_total_mb": 44.19,
+  "source": "ScienceDB Weibo train_dataset",
+  "dataset_doi": "10.57760/sciencedb.j00133.00366",
+  "license": "CC BY 4.0",
+  "privacy": "user_id 为账号名 sha256 前 16 位；原始账号/微博ID/图片URL 仅在内部溯源文件",
+  "crawl_time": "2026-10-26 10:07:24"
+}

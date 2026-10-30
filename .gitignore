@@ -1,0 +1,45 @@
+# secrets
+.env
+deploy/.env
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+backend/.venv/
+
+# node
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+
+# local databases
+*.db
+*.db-wal
+*.db-shm
+backend/test_opinion.db*
+
+# raw/private/large data
+data/raw/
+data/crawl/images/
+data/crawl/_internal_provenance.csv
+data/crawl/_internal_account_map.csv
+data/processed/
+data/reference_datasets/
+output/
+output/models/
+output/logs/
+output/*.log
+
+# generated docs
+docs/*.html
+docs/*.pdf
+README.html
+README.pdf
+docs/figures/dashboard.png
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
