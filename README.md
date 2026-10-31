@@ -44,10 +44,14 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+> 内存 ≤ 2 GB 的服务器不要直接 `--build` 前端（Vite 会 OOM）。改用 `frontend/Dockerfile.prebuilt` + 本地构建的 `dist`，步骤见 [`docs/12_云服务器部署与访问控制.md`](docs/12_云服务器部署与访问控制.md) 第 3.4 节。
+
 - 前端：<http://localhost:8080>
 - API 文档（服务器本机）：<http://localhost:8000/docs>
 - 公网访问时：`http://服务器IP:8080`，API 文档走 `http://服务器IP:8080/docs`
 - 健康检查：`http://服务器IP:8080/api/health`
+
+> 本仓库默认 web 端口是 **8080**。当前云服务器实例的 8080 已被同机另一个项目占用，实际映射为 **8081**，访问 `http://服务器IP:8081`。详见 [`docs/12_云服务器部署与访问控制.md`](docs/12_云服务器部署与访问控制.md)。
 
 默认 `CRAWLER_MODE=mock`，只读录制样本，不访问微博。
 
@@ -111,15 +115,18 @@ backend/
   app/               FastAPI、SQLAlchemy、鉴权、业务服务、种子数据
   crawler/           微博客户端、解析器、账号池、任务、调度器、worker、fixtures
   tests/             API/解析/账号池/队列测试
+  Dockerfile.fast    低内存/国内环境构建（阿里云 PyPI 镜像）
 frontend/
   src/views/         舆情列表、趋势看板、标注工作台、设置
   src/layout/        侧边栏布局
   src/api.js         Axios + JWT
   src/router.js      Hash 路由 + 登录/管理员守卫
+  Dockerfile.prebuilt 复用本地 dist 的 Nginx 镜像（服务器不跑 Vite）
 deploy/
   docker-compose.yml db/api/crawler/web
   nginx.conf         静态托管 + /api 反代
   .env.example       密钥与模式模板
+  backup.sh          pg_dump + gzip，保留 14 天
 docs/
   10_产品设计文档.md
   11_系统架构设计.md
@@ -128,26 +135,41 @@ dashboard/           历史离线大屏（保留）
 data/crawl/          1,000 条匿名公开数据样本（演示）
 ```
 
+## 当前部署实例（2026-10-31）
+
+| 项目 | 状态 |
+|---|---|
+| 访问方式 | `http://<服务器IP>:8081`（8080 已被同机另一个项目占用） |
+| 运行环境 | 阿里云轻量应用服务器，Docker Compose，PostgreSQL 16 |
+| 数据 | 1,003 条公开演示帖子 + 自动情感结果；490 条模拟热搜快照 |
+| 采集 | `CRAWLER_MODE=mock`，**未接真实微博** |
+| 人工标注 | 0 条；评估页暂无有意义的准确率/F1 |
+| 情感引擎 | `local`，当前回退为词典 `lexicon-v1`；仓库未附带训练模型文件 |
+| 公网暴露 | 仅 web 8081；api 绑定 `127.0.0.1:8000`；PostgreSQL 不映射 |
+| 备份 | 每日 03:00 `pg_dump`，保留 14 天；已做恢复演练 |
+
+> 公网 IP、密码、Cookie 不写入仓库。部署细节与安全清单见 [`docs/12_云服务器部署与访问控制.md`](docs/12_云服务器部署与访问控制.md)。
+
 ## 设计边界与当前状态
 
-已完成并在本机验证：
+已在云服务器验证：
 
-- FastAPI + JWT + RBAC、帖子/趋势/热搜/标注/评估/配置 API；
-- SQLite 建表与 `v_sentiment_final` 视图，11 个 pytest 通过；
-- Vue3 四页面，`npm run build` 通过；
-- Mock 采集、解析器、账号池冷却、情感队列与 worker；
-- 1,000 条公开数据演示导入 + 本地 TF-IDF+LR 自动打分。
+- 后端 11 个 pytest 通过；前端 `npm run build` 通过；
+- Docker Compose 四服务、PostgreSQL 16、Nginx 反代、JWT 登录；
+- 1,003 条演示数据导入，四个页面正常出数；
+- Mock 采集、情感队列、自动打分；
+- 备份脚本与恢复演练（恢复后 `post=1003`、`sentiment_auto=1003`）。
 
-需要环境支持、未在本机实际运行：
+仍需环境或配置：
 
-- Docker Compose 与 PostgreSQL 16（本机未安装 Docker）；
-- 真实微博 HTTP 采集（需要管理员提供 Cookie）；
+- 真实微博 HTTP 采集（需要管理员导入 Cookie，先小流量验证）；
 - 扫码登录（返回 501，当前用手动 Cookie 导入）；
-- LLM 引擎（需要配置 OpenAI 兼容 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`）。
+- LLM 引擎（需要配置 OpenAI 兼容 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`）；
+- 人工标注与引擎评估（当前 0 条人工标注）。
 
 诚实说明：
 
-- `local` 引擎当前是文本 TF-IDF+LR，文件缺失时退化为词典；**不是中文 RoBERTa**。
+- `local` 引擎支持 `output/models/baselines.joblib` 的文本 TF-IDF+LR；当前部署没有该文件，实际使用词典 `lexicon-v1`，**不是 RoBERTa，也不是已训练模型**。
 - 演示数据来自公开数据集，不是实时爬取；不伪造人工标注，评估页在未标注时显示 0 条。
 - 告警推送、分布式爬虫、代理池、多平台不在本期范围。
 
